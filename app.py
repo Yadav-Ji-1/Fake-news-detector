@@ -71,4 +71,4 @@ if st.button("Check with Proof"):
                     st.progress(r['similarity'])
 
 st.markdown("---")
-st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")
+st.caption("Made with ❤️ using SerpAPI & SentenceTransformers-Ekanth yadav")
