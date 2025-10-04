@@ -3,10 +3,11 @@ import joblib
 import re, string
 import streamlit.components.v1 as components
 
-# Load model
+# ---------------- Load model & vectorizer ----------------
 model = joblib.load("src/fake_news_model.pkl")
 vectorizer = joblib.load("src/vectorizer.pkl")
 
+# ---------------- Text cleaning function ----------------
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"http\S+|www\S+|https\S+", '', text)
@@ -14,9 +15,11 @@ def clean_text(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
     return text
 
+# ---------------- Initialize history ----------------
 if 'history' not in st.session_state:
     st.session_state.history = []
 
+# ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="Fake News Detector", page_icon="📰", layout="wide")
 
 # ---------------- Dramatic CSS ----------------
@@ -88,7 +91,7 @@ if st.button("CHECK"):
         if prediction.lower() == "fake":
             # Fake news dramatic effect
             st.markdown(f"<h2 style='color:red; text-shadow:0 0 20px red;'>🚨 FAKE NEWS ALERT 🚨</h2>", unsafe_allow_html=True)
-            # Screen shake effect (simple simulation)
+            # Screen shake effect
             components.html("""
             <script>
             let body = document.body;
@@ -104,7 +107,7 @@ if st.button("CHECK"):
             """, height=0)
         else:
             st.markdown(f"<h2 style='color:#00ff00; text-shadow:0 0 20px #00ff00;'>✅ REAL NEWS</h2>", unsafe_allow_html=True)
-            # Confetti
+            # Confetti for real news
             confetti_html = """
             <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
             <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_jbrw3hcz.json"  
@@ -115,7 +118,8 @@ if st.button("CHECK"):
             autoplay></lottie-player>
             """
             components.html(confetti_html, height=320)
-        # Confidence
+
+        # Confidence bar
         st.progress(int(confidence))
         st.markdown(f"<p>Confidence: <b>{confidence:.2f}%</b></p>", unsafe_allow_html=True)
         result_text = f"{prediction.upper()} ({confidence:.2f}%)"
