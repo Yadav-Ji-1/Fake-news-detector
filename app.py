@@ -1,51 +1,43 @@
 import streamlit as st
-from serpapi import GoogleSearch
 from sentence_transformers import SentenceTransformer, util
+from googlesearch import search
 
 # ---------------- Settings ----------------
-st.set_page_config(page_title="Smart Fake News Checker", page_icon="🧠", layout="centered")
+st.set_page_config(
+    page_title="Smart Fake News Checker",
+    page_icon="🧠",
+    layout="wide"  # Use full width for compact layout
+)
 
-# 🔑 SerpAPI key from Streamlit Secrets
-API_KEY = st.secrets["SERPAPI_KEY"]
-
-# Load SentenceTransformer model
+# Load model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # ---------------- UI ----------------
-st.title("🧠 Smart Fake News Detector")
-st.markdown("Check any news article and get real-time web evidence 🔍")
+st.markdown("<h1 style='text-align:center'>🧠 Smart Fake News Detector</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center'>Check any news article and get real-time web evidence 🔍</p>", unsafe_allow_html=True)
 
-news = st.text_area("Paste any news or claim here:", height=150)
+# Input area
+news = st.text_area("Paste any news or claim here:", height=120)
 
 if st.button("Check with Proof"):
     if not news.strip():
         st.warning("Please enter some news text!")
     else:
         with st.spinner("🔍 Searching for supporting sources..."):
-            # Step 1: Search Google using Cloud-compatible serpapi
+            # Step 1: Search Google
+            results = []
             try:
-                params = {
-                    "engine": "google",
-                    "q": news,
-                    "api_key": API_KEY,
-                    "num": "5"
-                }
-                search = GoogleSearch(params)
-                results_dict = search.get_dict()
-                results = results_dict.get("organic_results", [])
+                for url in search(news, num_results=5):
+                    results.append({"link": url, "title": url, "snippet": ""})
             except Exception as e:
-                st.error(f"Error while fetching search results: {e}")
-                results = []
+                st.error(f"Error fetching search results: {e}")
 
             if not results:
                 st.error("No matching sources found. Try clearer wording.")
             else:
                 # Step 2: Compare embeddings
                 claim_emb = embedder.encode(news, convert_to_tensor=True)
-                texts = [
-                    r.get("title", "") + ". " + r.get("snippet", "")
-                    for r in results
-                ]
+                texts = [r["title"] + ". " + r.get("snippet", "") for r in results]
                 evidence_emb = embedder.encode(texts, convert_to_tensor=True)
                 sims = util.cos_sim(claim_emb, evidence_emb)[0].cpu().numpy()
 
@@ -64,16 +56,18 @@ if st.button("Check with Proof"):
                     verdict = "🚨 Likely FAKE (no supporting info found)"
                     color = "red"
 
-                # Step 3: Show result
+                # Step 3: Show result in center
                 st.markdown(f"<h2 style='color:{color};text-align:center'>{verdict}</h2>", unsafe_allow_html=True)
 
-                # Step 4: Show top 3 proofs
+                # Step 4: Top Evidence in 3 columns
                 st.subheader("Top Evidence from Web")
-                for r in results[:3]:
-                    st.markdown(f"**[{r.get('title','No Title')}]({r.get('link','#')})**")
-                    st.write(r.get("snippet", ""))
-                    st.progress(min(max(int(r['similarity'] * 100), 0), 100))
+                cols = st.columns(3)
+                for i, r in enumerate(results[:3]):
+                    with cols[i]:
+                        st.markdown(f"**[{r['title']}]({r['link']})**")
+                        st.write(r.get("snippet", ""))
+                        st.progress(min(max(int(r['similarity']*100), 0), 100))
 
-# ---------------- Footer ----------------
+# Footer
 st.markdown("---")
-st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")
+st.caption("Made with ❤️ using googlesearch & SentenceTransformers")
