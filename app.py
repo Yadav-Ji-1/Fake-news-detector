@@ -3,7 +3,7 @@ from serpapi import GoogleSearch
 from sentence_transformers import SentenceTransformer, util
 
 # ---------------- Settings ----------------
-st.set_page_config(page_title="Smart Fake News Checker", page_icon="🧠", layout="centered")
+st.set_page_config(page_title="Smart Fake News Checker-Ekanthydv", page_icon="🧠", layout="centered")
 
 # ---------------- API Key ----------------
 # Streamlit secrets me dal diya hai
