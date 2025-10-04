@@ -22,9 +22,15 @@ if st.button("Check with Proof"):
         st.warning("Please enter some news text!")
     else:
         with st.spinner("🔍 Searching for supporting sources..."):
-            # Step 1: Search Google using latest serpapi syntax
+            # Step 1: Search Google using Cloud-compatible serpapi
             try:
-                search = GoogleSearch({"q": news, "api_key": API_KEY, "num": 5})
+                params = {
+                    "engine": "google",
+                    "q": news,
+                    "api_key": API_KEY,
+                    "num": "5"
+                }
+                search = GoogleSearch(params)
                 results_dict = search.get_dict()
                 results = results_dict.get("organic_results", [])
             except Exception as e:
@@ -64,7 +70,7 @@ if st.button("Check with Proof"):
                 # Step 4: Show top 3 proofs
                 st.subheader("Top Evidence from Web")
                 for r in results[:3]:
-                    st.markdown(f"**[{r['title']}]({r['link']})**")
+                    st.markdown(f"**[{r.get('title','No Title')}]({r.get('link','#')})**")
                     st.write(r.get("snippet", ""))
                     st.progress(min(max(int(r['similarity'] * 100), 0), 100))
 
