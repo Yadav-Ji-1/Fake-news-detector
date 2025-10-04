@@ -1,5 +1,5 @@
-streamlit==1.25.0
+streamlit
 serpapi
-sentence-transformers==2.2.2
-torch==2.3.1
-transformers==4.36.2
+sentence-transformers
+torch
+transformers
