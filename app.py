@@ -13,7 +13,7 @@ API_KEY = st.secrets["SERPAPI_KEY"]
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # ---------------- UI ----------------
-st.title("🧠 Smart Fake News Detector")
+st.title("🧠 Smart Fake News Detector-Ekantydv")
 st.markdown("Check any news article or claim and get real-time evidence 🔍")
 
 news = st.text_area("Paste any news or claim here:", height=150,
