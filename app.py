@@ -1,15 +1,15 @@
 import streamlit as st
 from sentence_transformers import SentenceTransformer, util
-from googlesearch import search
+from googlesearch import search  # Free, no API key required
 
 # ---------------- Settings ----------------
 st.set_page_config(
     page_title="Smart Fake News Checker",
     page_icon="🧠",
-    layout="wide"  # Use full width for compact layout
+    layout="wide"
 )
 
-# Load model
+# Load SentenceTransformer model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # ---------------- UI ----------------
@@ -24,7 +24,7 @@ if st.button("Check with Proof"):
         st.warning("Please enter some news text!")
     else:
         with st.spinner("🔍 Searching for supporting sources..."):
-            # Step 1: Search Google
+            # Step 1: Google search (free, no API)
             results = []
             try:
                 for url in search(news, num_results=5):
@@ -56,7 +56,7 @@ if st.button("Check with Proof"):
                     verdict = "🚨 Likely FAKE (no supporting info found)"
                     color = "red"
 
-                # Step 3: Show result in center
+                # Step 3: Show result
                 st.markdown(f"<h2 style='color:{color};text-align:center'>{verdict}</h2>", unsafe_allow_html=True)
 
                 # Step 4: Top Evidence in 3 columns
