@@ -3,11 +3,10 @@ import joblib
 import re, string
 import streamlit.components.v1 as components
 
-# ---------------- Load model & vectorizer ----------------
+# Load model
 model = joblib.load("src/fake_news_model.pkl")
 vectorizer = joblib.load("src/vectorizer.pkl")
 
-# ---------------- Text cleaning function ----------------
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"http\S+|www\S+|https\S+", '', text)
@@ -15,95 +14,97 @@ def clean_text(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
     return text
 
-# ---------------- Initialize history ----------------
 if 'history' not in st.session_state:
     st.session_state.history = []
 
-# ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="Fake News Detector", page_icon="📰", layout="wide")
 
-# Animated gradient background
+# ---------------- Dramatic CSS ----------------
 st.markdown("""
 <style>
 body {
-    margin: 0;
-    height: 100vh;
-    background: linear-gradient(270deg, #1e3c72, #2a5298, #1e3c72);
-    background-size: 600% 600%;
-    animation: gradientBG 15s ease infinite;
-    color: white;
-    font-family: 'Segoe UI', sans-serif;
-}
-@keyframes gradientBG {
-    0%{background-position:0% 50%}
-    50%{background-position:100% 50%}
-    100%{background-position:0% 50%}
+    background-color: #0d0d0d;
+    color: #00ff99;
+    font-family: 'Courier New', monospace;
 }
 h1 {
-    color: #ffd700;
-}
-.stButton>button {
-    background: linear-gradient(90deg,#4facfe,#00f2fe);
-    color: white;
-    font-weight: bold;
-    border-radius: 12px;
-    padding: 12px 24px;
-    transition: transform 0.2s;
-}
-.stButton>button:hover {
-    transform: scale(1.05);
+    text-align: center;
+    color: #ff0000;
+    text-shadow: 0 0 20px red, 0 0 40px red;
 }
 .stTextArea textarea {
-    background-color: rgba(0,0,0,0.5);
-    color: white;
+    background-color: #1a1a1a;
+    color: #00ff99;
     border-radius: 12px;
-    border: 1px solid #444;
+    border: 2px solid #00ff99;
+    font-weight: bold;
+}
+.stButton>button {
+    background-color: #ff0000;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 10px;
+    padding: 12px 24px;
+    box-shadow: 0 0 20px #ff0000;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 10px #ff0000; }
+    50% { box-shadow: 0 0 30px #ff4b4b; }
+    100% { box-shadow: 0 0 10px #ff0000; }
 }
 .card {
-    background-color: rgba(0,0,0,0.6);
+    background-color: #1a1a1a;
     padding: 20px;
     border-radius: 15px;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    border: 2px solid #00ff99;
+    box-shadow: 0 0 20px #00ff99;
     margin-bottom: 20px;
-}
-.tooltip {
-    border-bottom: 1px dotted white; 
-    cursor: help;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown("<h1 style='text-align: center;'>📰 Fake News Detector</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size:18px;'>Paste your news article below to check if it is <b>Fake</b> or <b>Real</b>. <span class='tooltip' title='Fake news is misleading or false content. Real news is verified and reliable.'>ℹ️</span></p>", unsafe_allow_html=True)
+st.markdown("<h1>📰 FAKE NEWS DETECTOR</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#ff0000;'>Paste news below. Be ready for the truth...</p>", unsafe_allow_html=True)
 
-# Input container
+# Input
 with st.container():
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    news_text = st.text_area("Enter News Text Here:", height=200)
+    news_text = st.text_area("Enter News Here:", height=200)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Button & result
+# Button & Result
 result_text = ""
-if st.button("Check News"):
+if st.button("CHECK"):
     if news_text.strip() != "":
         clean_news = clean_text(news_text)
         vect_text = vectorizer.transform([clean_news])
         prediction = model.predict(vect_text)[0]
         confidence = model.predict_proba(vect_text).max() * 100
 
-        # Update history
-        st.session_state.history.append((news_text, prediction, confidence))
-        if len(st.session_state.history) > 5:
-            st.session_state.history = st.session_state.history[-5:]
-
-        # Result card
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         if prediction.lower() == "fake":
-            st.markdown(f"<h3 style='color:#ff4b4b;'>🚨 This news seems <b>FAKE</b></h3>", unsafe_allow_html=True)
+            # Fake news dramatic effect
+            st.markdown(f"<h2 style='color:red; text-shadow:0 0 20px red;'>🚨 FAKE NEWS ALERT 🚨</h2>", unsafe_allow_html=True)
+            # Screen shake effect (simple simulation)
+            components.html("""
+            <script>
+            let body = document.body;
+            let i=0;
+            function shake(){
+                let x = Math.random()*10-5;
+                let y = Math.random()*10-5;
+                body.style.transform='translate('+x+'px,'+y+'px)';
+                if(i<20){i++; requestAnimationFrame(shake);} else {body.style.transform='translate(0,0)';}
+            }
+            shake();
+            </script>
+            """, height=0)
         else:
-            st.markdown(f"<h3 style='color:#00ff99;'>✅ This news seems <b>REAL</b></h3>", unsafe_allow_html=True)
-            # Confetti HTML
+            st.markdown(f"<h2 style='color:#00ff00; text-shadow:0 0 20px #00ff00;'>✅ REAL NEWS</h2>", unsafe_allow_html=True)
+            # Confetti
             confetti_html = """
             <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
             <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_jbrw3hcz.json"  
@@ -114,60 +115,15 @@ if st.button("Check News"):
             autoplay></lottie-player>
             """
             components.html(confetti_html, height=320)
-        # Confidence meter
+        # Confidence
         st.progress(int(confidence))
         st.markdown(f"<p>Confidence: <b>{confidence:.2f}%</b></p>", unsafe_allow_html=True)
         result_text = f"{prediction.upper()} ({confidence:.2f}%)"
         st.markdown("</div>", unsafe_allow_html=True)
 
-# Copy result button
+# Copy Result
 if result_text:
-    st.write("Copy result:")
-    st.text_area("Result", value=result_text, height=50)
-
-# History panel
-if st.session_state.history:
-    st.markdown("<h3>Last 5 Predictions:</h3>", unsafe_allow_html=True)
-    for i, (text, pred, conf) in enumerate(reversed(st.session_state.history)):
-        st.markdown(f"<div class='card'><b>News {i+1}:</b> {text[:100]}... <br> Prediction: <b>{pred.upper()}</b> | Confidence: {conf:.2f}%</div>", unsafe_allow_html=True)
+    st.text_area("Copy Result", value=result_text, height=50)
 
 # Footer
-st.markdown("<p style='text-align:center; color:gray; font-size:14px;'>Made with ❤️ using Streamlit</p>", unsafe_allow_html=True)    box-shadow: 0 0 20px rgba(255,215,0,0.3);
-    margin-bottom: 20px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Header
-st.markdown("<h1 style='text-align: center;'>📰 Tehelka Fake News Detector</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size:18px;'>Paste your news article below to check if it is <b>Fake</b> or <b>Real</b>.</p>", unsafe_allow_html=True)
-
-# Input container
-with st.container():
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    news_text = st.text_area("Enter News Text Here:", height=200)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# Button & result
-if st.button("Check News"):
-    if news_text.strip() != "":
-        clean_news = clean_text(news_text)
-        vect_text = vectorizer.transform([clean_news])
-        prediction = model.predict(vect_text)[0]
-        confidence = model.predict_proba(vect_text).max() * 100
-
-        # Result card
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        if prediction.lower() == "fake":
-            st.markdown(f"<h3 style='color:#ff4b4b;'>🚨 This news seems <b>FAKE</b></h3>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<h3 style='color:#00ff99;'>✅ This news seems <b>REAL</b></h3>", unsafe_allow_html=True)
-            # Show confetti animation for REAL news
-            st_lottie(confetti_animation, height=250, key="confetti")
-        st.markdown(f"<p>Confidence: <b>{confidence:.2f}%</b></p>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ Please enter some text to analyze.")
-
-# Footer
-st.markdown("<p style='text-align:center; color:gray; font-size:14px;'>Made with ❤️ using Streamlit</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:gray;'>Made with ❤️ - Himanshu</p>", unsafe_allow_html=True)
