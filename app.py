@@ -1,6 +1,8 @@
 import streamlit as st
 from sentence_transformers import SentenceTransformer, util
-from googlesearch import search  # Free, no API key required
+from googlesearch import search
+import requests
+from bs4 import BeautifulSoup
 
 # ---------------- Settings ----------------
 st.set_page_config(
@@ -9,14 +11,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load SentenceTransformer model
+# Load model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # ---------------- UI ----------------
 st.markdown("<h1 style='text-align:center'>🧠 Smart Fake News Detector</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align:center'>Check any news article and get real-time web evidence 🔍</p>", unsafe_allow_html=True)
 
-# Input area
 news = st.text_area("Paste any news or claim here:", height=120)
 
 if st.button("Check with Proof"):
@@ -24,11 +25,19 @@ if st.button("Check with Proof"):
         st.warning("Please enter some news text!")
     else:
         with st.spinner("🔍 Searching for supporting sources..."):
-            # Step 1: Google search (free, no API)
             results = []
             try:
-                for url in search(news, num_results=5):
-                    results.append({"link": url, "title": url, "snippet": ""})
+                for url in search(news, num_results=10):  # Increase number of results
+                    snippet = ""
+                    try:
+                        r = requests.get(url, timeout=5)
+                        soup = BeautifulSoup(r.text, 'html.parser')
+                        p = soup.find('p')
+                        if p:
+                            snippet = p.get_text()
+                    except:
+                        snippet = ""
+                    results.append({"link": url, "title": url, "snippet": snippet})
             except Exception as e:
                 st.error(f"Error fetching search results: {e}")
 
@@ -56,10 +65,10 @@ if st.button("Check with Proof"):
                     verdict = "🚨 Likely FAKE (no supporting info found)"
                     color = "red"
 
-                # Step 3: Show result
+                # Step 3: Show verdict
                 st.markdown(f"<h2 style='color:{color};text-align:center'>{verdict}</h2>", unsafe_allow_html=True)
 
-                # Step 4: Top Evidence in 3 columns
+                # Step 4: Show top 3 evidence
                 st.subheader("Top Evidence from Web")
                 cols = st.columns(3)
                 for i, r in enumerate(results[:3]):
@@ -70,4 +79,4 @@ if st.button("Check with Proof"):
 
 # Footer
 st.markdown("---")
-st.caption("Made with ❤️ using googlesearch & SentenceTransformers")
+st.caption("Made with ❤️ using googlesearch, BeautifulSoup & SentenceTransformers")
