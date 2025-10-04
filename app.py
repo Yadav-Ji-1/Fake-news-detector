@@ -10,7 +10,7 @@ st.set_page_config(page_title="Smart Fake News Checker-Ekanthydv", page_icon="ðŸ
 API_KEY = st.secrets["SERPAPI_KEY"]
 
 # ---------------- Model ----------------
-embedder = SentenceTransformer('all-MiniLM-L6-v2')
+embedder = SentenceTransformer('all-MiniLM-L6-v2', device='cpu')
 
 # ---------------- UI ----------------
 st.title("ðŸ§  Smart Fake News Detector-Ekantydv")
