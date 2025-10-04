@@ -1,11 +1,14 @@
 import streamlit as st
-from serpapi import GoogleSearch
+from serpapi.google_search_results import GoogleSearch
 from sentence_transformers import SentenceTransformer, util
 
 # ---------------- Settings ----------------
 st.set_page_config(page_title="Smart Fake News Checker", page_icon="🧠", layout="centered")
 
-API_KEY = "7d546ae21ecbfe1c01aebe795ca5eab144216e2f63fc0461297750de9efc9ace"  # <-- yahan apni SerpAPI key daal
+# 🔑 Yahan apni SerpAPI key daalo
+API_KEY = "7d546ae21ecbfe1c01aebe795ca5eab144216e2f63fc0461297750de9efc9ace"
+
+# Model load
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # ---------------- UI ----------------
@@ -60,6 +63,7 @@ if st.button("Check with Proof"):
                     st.write(r.get("snippet", ""))
                     st.progress(r['similarity'])
 
-# ---------------- Footer ----------------
+st.markdown("---")
+st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")# ---------------- Footer ----------------
 st.markdown("---")
 st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")
