@@ -82,6 +82,12 @@ h1 {
     font-size: 14px;
     margin-top: 20px;
 }
+.main-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
 </style>
 
 <!-- Particle background -->
@@ -108,67 +114,99 @@ particlesJS("particles-js", {
 </script>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown("<h1>📰 FAKE NEWS DETECTOR</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center; color:#ff0000;'>Paste news below. Be ready for the truth...</p>", unsafe_allow_html=True)
+# ---------------- Tabs ----------------
+tab1, tab2, tab3 = st.tabs(["Check News", "History", "About"])
 
-# Input
-with st.container():
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    news_text = st.text_area("Enter News Here:", height=200)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# Button & Result
-result_text = ""
-if st.button("CHECK"):
-    if news_text.strip() != "":
-        clean_news = clean_text(news_text)
-        vect_text = vectorizer.transform([clean_news])
-        prediction = model.predict(vect_text)[0]
-        confidence = model.predict_proba(vect_text).max() * 100
-
+# ---------------- Tab 1: Check News ----------------
+with tab1:
+    with st.container():
+        st.markdown("<div class='main-container'>", unsafe_allow_html=True)
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        if prediction.lower() == "fake":
-            # Fake news dramatic effect + sound
-            st.markdown(f"<h2 style='color:red; text-shadow:0 0 20px red;'>🚨 FAKE NEWS ALERT 🚨</h2>", unsafe_allow_html=True)
-            components.html("""
-            <script>
-            let audio = new Audio('https://freesound.org/data/previews/514/514975_10296327-lq.mp3');
-            audio.play();
-            let body = document.body;
-            let i=0;
-            function shake(){
-                let x = Math.random()*10-5;
-                let y = Math.random()*10-5;
-                body.style.transform='translate('+x+'px,'+y+'px)';
-                if(i<20){i++; requestAnimationFrame(shake);} else {body.style.transform='translate(0,0)';}
-            }
-            shake();
-            </script>
-            """, height=0)
-        else:
-            st.markdown(f"<h2 style='color:#00ff00; text-shadow:0 0 20px #00ff00;'>✅ REAL NEWS</h2>", unsafe_allow_html=True)
-            # Confetti for real news
-            confetti_html = """
-            <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
-            <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_jbrw3hcz.json"  
-            background="transparent"  
-            speed="1"  
-            style="width: 300px; height: 300px;"  
-            loop  
-            autoplay></lottie-player>
-            """
-            components.html(confetti_html, height=320)
-
-        # Confidence bar
-        st.progress(int(confidence))
-        st.markdown(f"<p>Confidence: <b>{confidence:.2f}%</b></p>", unsafe_allow_html=True)
-        result_text = f"{prediction.upper()} ({confidence:.2f}%)"
+        news_text = st.text_area("Enter News Here:", height=200)
         st.markdown("</div>", unsafe_allow_html=True)
 
-# Copy Result
-if result_text:
-    st.text_area("Copy Result", value=result_text, height=50)
+        result_text = ""
+        if st.button("CHECK"):
+            if news_text.strip() != "":
+                clean_news = clean_text(news_text)
+                vect_text = vectorizer.transform([clean_news])
+                prediction = model.predict(vect_text)[0]
+                confidence = model.predict_proba(vect_text).max() * 100
 
-# Footer
+                # Update history
+                st.session_state.history.append((news_text, prediction, confidence))
+                if len(st.session_state.history) > 10:
+                    st.session_state.history = st.session_state.history[-10:]
+
+                # Result card
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                if prediction.lower() == "fake":
+                    st.markdown(f"<h2 style='color:red; text-shadow:0 0 20px red;'>🚨 FAKE NEWS ALERT 🚨</h2>", unsafe_allow_html=True)
+                    # Shake + sound
+                    components.html("""
+                    <script>
+                    let audio = new Audio('https://freesound.org/data/previews/514/514975_10296327-lq.mp3');
+                    audio.play();
+                    let body = document.body;
+                    let i=0;
+                    function shake(){
+                        let x = Math.random()*10-5;
+                        let y = Math.random()*10-5;
+                        body.style.transform='translate('+x+'px,'+y+'px)';
+                        if(i<20){i++; requestAnimationFrame(shake);} else {body.style.transform='translate(0,0)';}
+                    }
+                    shake();
+                    </script>
+                    """, height=0)
+                else:
+                    st.markdown(f"<h2 style='color:#00ff00; text-shadow:0 0 20px #00ff00;'>✅ REAL NEWS</h2>", unsafe_allow_html=True)
+                    # Confetti
+                    confetti_html = """
+                    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+                    <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_jbrw3hcz.json"  
+                    background="transparent"  
+                    speed="1"  
+                    style="width: 300px; height: 300px;"  
+                    loop  
+                    autoplay></lottie-player>
+                    """
+                    components.html(confetti_html, height=320)
+
+                st.progress(int(confidence))
+                st.markdown(f"<p>Confidence: <b>{confidence:.2f}%</b></p>", unsafe_allow_html=True)
+                result_text = f"{prediction.upper()} ({confidence:.2f}%)"
+                st.markdown("</div>", unsafe_allow_html=True)
+
+        if result_text:
+            st.text_area("Copy Result", value=result_text, height=50)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------- Tab 2: History ----------------
+with tab2:
+    if st.session_state.history:
+        st.markdown("<h3 style='text-align:center;'>Last Predictions:</h3>", unsafe_allow_html=True)
+        for i, (text, pred, conf) in enumerate(reversed(st.session_state.history)):
+            st.markdown(f"""
+            <div class='card'>
+                <b>News {i+1}:</b> {text[:150]}... <br>
+                Prediction: <b>{pred.upper()}</b> | Confidence: {conf:.2f}%
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.markdown("<p style='text-align:center;'>No history yet. Check some news!</p>", unsafe_allow_html=True)
+
+# ---------------- Tab 3: About ----------------
+with tab3:
+    st.markdown("""
+    <div style='text-align:center;'>
+        <h3>About This App</h3>
+        <p>📰 This is a cinematic Fake News Detector built with Streamlit.</p>
+        <p>✅ Real news shows confetti, 🚨 Fake news triggers shake + sound.</p>
+        <p>💡 Neon theme, particle background, hover effects for professional look.</p>
+        <p>Made with ❤️ by Himanshu</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------- Footer ----------------
 st.markdown('<p class="footer">Made with ❤️ - Himanshu</p>', unsafe_allow_html=True)
