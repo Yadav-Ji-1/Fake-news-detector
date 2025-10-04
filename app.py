@@ -1,5 +1,5 @@
 import streamlit as st
-from serpapi.google_search_results import GoogleSearch
+from serpapi import GoogleSearch
 from sentence_transformers import SentenceTransformer, util
 
 # ---------------- Settings ----------------
@@ -22,10 +22,11 @@ if st.button("Check with Proof"):
         st.warning("Please enter some news text!")
     else:
         with st.spinner("🔍 Searching for supporting sources..."):
-            # Step 1: Search Google
+            # Step 1: Search Google using latest serpapi syntax
             try:
                 search = GoogleSearch({"q": news, "api_key": API_KEY, "num": 5})
-                results = search.get_dict().get("organic_results", [])
+                results_dict = search.get_dict()
+                results = results_dict.get("organic_results", [])
             except Exception as e:
                 st.error(f"Error while fetching search results: {e}")
                 results = []
