@@ -3,3 +3,5 @@ googlesearch-python
 sentence-transformers
 torch
 transformers
+beautifulsoup4
+requests
