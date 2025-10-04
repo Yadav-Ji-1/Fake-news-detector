@@ -60,6 +60,6 @@ if st.button("Check with Proof"):
                     st.write(r.get("snippet", ""))
                     st.progress(r['similarity'])
 
+# ---------------- Footer ----------------
 st.markdown("---")
-st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")st.markdown("---")
 st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")
