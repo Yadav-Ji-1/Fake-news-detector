@@ -5,3 +5,4 @@ torch
 transformers
 beautifulsoup4
 requests
+google-search-results
