@@ -1,6 +1,6 @@
-streamlit
-scikit-learn
-pandas
-numpy
-joblib
-streamlit-lottie
+streamlit==1.26.0
+scikit-learn==1.3.2
+joblib==1.3.2
+numpy==1.26.0
+pandas==2.1.1
+requests==2.31.0
