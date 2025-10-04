@@ -5,10 +5,10 @@ from sentence_transformers import SentenceTransformer, util
 # ---------------- Settings ----------------
 st.set_page_config(page_title="Smart Fake News Checker", page_icon="🧠", layout="centered")
 
-# 🔑 Yahan apni SerpAPI key daalo
-API_KEY = "7d546ae21ecbfe1c01aebe795ca5eab144216e2f63fc0461297750de9efc9ace"
+# 🔑 SerpAPI key from Streamlit Secrets
+API_KEY = st.secrets["SERPAPI_KEY"]
 
-# Model load
+# Load SentenceTransformer model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # ---------------- UI ----------------
@@ -23,8 +23,12 @@ if st.button("Check with Proof"):
     else:
         with st.spinner("🔍 Searching for supporting sources..."):
             # Step 1: Search Google
-            search = GoogleSearch({"q": news, "api_key": API_KEY, "num": 5})
-            results = search.get_dict().get("organic_results", [])
+            try:
+                search = GoogleSearch({"q": news, "api_key": API_KEY, "num": 5})
+                results = search.get_dict().get("organic_results", [])
+            except Exception as e:
+                st.error(f"Error while fetching search results: {e}")
+                results = []
 
             if not results:
                 st.error("No matching sources found. Try clearer wording.")
@@ -61,9 +65,8 @@ if st.button("Check with Proof"):
                 for r in results[:3]:
                     st.markdown(f"**[{r['title']}]({r['link']})**")
                     st.write(r.get("snippet", ""))
-                    st.progress(r['similarity'])
+                    st.progress(min(max(int(r['similarity'] * 100), 0), 100))
 
-st.markdown("---")
-st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")# ---------------- Footer ----------------
+# ---------------- Footer ----------------
 st.markdown("---")
 st.caption("Made with ❤️ using SerpAPI & SentenceTransformers")
