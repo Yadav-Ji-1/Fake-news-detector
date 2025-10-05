@@ -185,8 +185,6 @@ def nli_entailment_prob(premise, hypothesis):
         logits = nli_model(**inputs).logits
         probs = F.softmax(logits, dim=1)[0]
     # NLI labels are typically: 0=entailment, 1=neutral, 2=contradiction
-    # We want probability of NOT contradiction (1 - contradiction_prob) or specifically entailment (prob[0])
-    # The roberta-large-mnli model often uses 0: entailment, 1: neutral, 2: contradiction
     # We use entailment probability (index 0)
     return probs[0].item()
 
@@ -237,6 +235,98 @@ def analyze_top_articles(normalized, claim, top_k=4):
 
 # ---------------- Main UI inputs ----------------
 claim = st.text_area("Enter claim or news sentence:", height=140, placeholder="e.g. India defeats Pakistan in Asia Cup 2025")
+num_results = st.slider("Number of news results to fetch (SerpAPI)", 5, 30, 10, step=5)
+top_k_for_verdict = st.slider("Top-K matches to analyze (NLI+semantics)", 1, 6, 4)
+if st.button("Verify Claim"):
+    if not claim.strip():
+        st.warning("Please enter a claim.")
+    else:
+        with st.spinner("Analysing... (this may take a few seconds)"):
+            # 1) Rank-claim check (Wikipedia) if applicable
+            ordinal, role = find_ordinal_and_role(claim)
+            person_candidate = None
+            country = "India" if "india" in claim.lower() else ""  # basic default; can improve
+            if ordinal and role:
+                person_candidate = extract_person_candidate(claim)
+                m_country = re.search(r'\bof\s+([A-Za-z\s]+)', claim, flags=re.IGNORECASE)
+                if m_country:
+                    country = m_country.group(1).strip()
+                rank_check = check_rank_claim_wikipedia(person_candidate, ordinal, role, country or "India", st.secrets["SERPAPI_KEY"])
+                if rank_check.get("decisive"):
+                    if rank_check.get("result"):
+                        st.markdown("<h2 style='color:green;text-align:center'>✅ TRUE</h2>", unsafe_allow_html=True)
+                        st.write(f"Reason: Authoritative list ({rank_check.get('wiki_url')}) shows **{rank_check.get('matched_name')}** as the {ordinal}th {role} of {country or 'the country'}.")
+                    else:
+                        st.markdown("<h2 style='color:red;text-align:center'>🚨 FAKE</h2>", unsafe_allow_html=True)
+                        st.write(f"Reason: Authoritative list ({rank_check.get('wiki_url')}) shows **{rank_check.get('matched_name')}** as the {rank_check.get('rank')}th {role}, not the {ordinal}th.")
+                    st.write("Source (for verification):", rank_check.get("wiki_url"))
+                    st.stop()  # done
+
+            # 2) SerpAPI fetch
+            try:
+                params = {"engine":"google", "q": claim, "tbm":"nws", "num": num_results, "api_key": st.secrets["SERPAPI_KEY"]}
+                search = GoogleSearch(params)
+                data = search.get_dict()
+                results = data.get("news_results") or data.get("organic_results") or []
+            except Exception as e:
+                st.error("Search failed: " + str(e))
+                results = []
+
+            if not results:
+                st.markdown("<h2 style='color:red;text-align:center'>🚨 FAKE</h2>", unsafe_allow_html=True)
+                st.write("Reason: No relevant news results returned by the live search API. Try adding context (date/event).")
+            else:
+                normalized = []
+                for r in results:
+                    title = r.get("title") or r.get("title_raw") or r.get("title_original") or ""
+                    snippet = r.get("snippet") or r.get("snippet_highlighted") or r.get("excerpt") or ""
+                    link = r.get("link") or r.get("source", {}).get("url") or r.get("source_link") or ""
+                    normalized.append({"title": title, "snippet": snippet, "link": link})
+
+                # compute decision via new intelligence module
+                final_score, avg_sim, avg_ent, avg_cred, analyzed = analyze_top_articles(normalized, claim, top_k=top_k_for_verdict)
+
+                # thresholds and output
+                if final_score >= 0.50:
+                    st.markdown("<h2 style='color:green;text-align:center'>✅ TRUE</h2>", unsafe_allow_html=True)
+                    st.write("Reason: Multiple sources provide semantic and logical (entailment) support for this claim.")
+                    st.write(f"Details — avg entailment: {avg_ent:.2f}, avg semantic sim: {avg_sim:.2f}, avg credibility boost: {avg_cred:.2f}")
+                else:
+                    st.markdown("<h2 style='color:red;text-align:center'>🚨 FAKE</h2>", unsafe_allow_html=True)
+                    st.write("Reason: No strong semantic + logical support found from credible sources.")
+                    st.write(f"Closest evidence metrics — avg entailment: {avg_ent:.2f}, avg semantic sim: {avg_sim:.2f}, avg credibility boost: {avg_cred:.2f}")
+
+                # show short synthesized reason
+                if final_score >= 0.5:
+                    # create short example excerpts from top analyzed
+                    ex = []
+                    for r in analyzed[:3]:
+                        if r.get("sem_sim", 0.0) > 0.4 and r.get("best_sent"):
+                            ex.append(textwrap.shorten(r.get("best_sent"), width=160, placeholder="..."))
+                    if ex:
+                        st.info("Example supporting excerpts: " + " | ".join(ex))
+                else:
+                    best = analyzed[0] if analyzed else None
+                    if best and best.get("best_sent"):
+                        st.info("Closest (but weak) excerpt: " + textwrap.shorten(best.get("best_sent") or best.get("snippet",""), width=220, placeholder="..."))
+
+                # transparency
+                # INDENTATION FIX START
+                with st.expander("Show analyzed top sources and scores"):
+                    for idx, r in enumerate(analyzed):
+                        st.markdown(f"**{idx+1}. {r.get('title') or r.get('link','(no title)')}**")
+                        st.write(f"- Domain: {domain_from_url(r.get('link',''))}")
+                        st.write(f"- Semantic similarity (sentence-level): {pretty_pct(r.get('sem_sim',0.0))}")
+                        st.write(f"- Entailment (NLI) probability: {pretty_pct(r.get('entail_p',0.0))}")
+                        st.write(f"- Credibility boost: {r.get('cred',0.0):.2f}")
+                        st.write(f"- Link: {r.get('link')}")
+                        st.markdown("---")
+                # INDENTATION FIX END
+
+# Footer
+st.markdown("---")
+st.caption("Made with ❤️ — SerpAPI + SentenceTransformers + NLI. Use responsibly and verify critical claims with official sources.")
+m = st.text_area("Enter claim or news sentence:", height=140, placeholder="e.g. India defeats Pakistan in Asia Cup 2025")
 num_results = st.slider("Number of news results to fetch (SerpAPI)", 5, 30, 10, step=5)
 top_k_for_verdict = st.slider("Top-K matches to analyze (NLI+semantics)", 1, 6, 4)
 if st.button("Verify Claim"):
