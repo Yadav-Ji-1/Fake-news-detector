@@ -59,7 +59,7 @@ ROLE_KEYWORDS = ["prime minister", "prime-minister", "pm", "president", "chief m
 
 def find_ordinal_and_role(text):
     t = text.lower()
-    num = None # Fixed Indentation
+    num = None
     m = re.search(r'\b(\d{1,2})(?:st|nd|rd|th)?\b', t)
     if m:
         num = int(m.group(1))
@@ -99,7 +99,7 @@ def normalize_name(s):
 def find_wikipedia_list_page(role, country, serp_api_key):
     query = f'List of {role} of {country} site:en.wikipedia.org'
     try:
-        params = {"engine":"google", "q": query, "api_key": serp_api_key, "num": 1}
+        params = {"engine":"google", "q": query, "api_key": st.secrets["SERPAPI_KEY"], "num": 1}
         search = GoogleSearch(params)
         res = search.get_dict()
         organic = res.get("organic_results") or []
@@ -238,6 +238,148 @@ def analyze_top_articles(normalized, claim, top_k):
         r["entail_p"] = entail_p
         r["neutral_p"] = neutral_p
         r["contra_p"] = contra_p
+        r["sem_sim"] = sem_sim
+        r["cred"] = cred
+        r["best_sent"] = best_sent 
+        
+    avg_sim = float(np.mean(sims)) if sims else 0.0
+    avg_ent = float(np.mean(entails)) if entails else 0.0
+    avg_neu = float(np.mean(neutral)) if neutral else 0.0
+    avg_con = float(np.mean(contradicts)) if contradicts else 0.0
+    avg_cred = float(np.mean(creds)) if creds else 0.0
+
+    # Calculate net support as (Entailment - Contradiction)
+    net_support = avg_ent - avg_con
+    
+    # DYNAMIC SCORING LOGIC
+    # SCORE 1: Support Score (Prioritizes credible logical support)
+    # This is the primary decision factor: Net Support * (1 + Credibility)
+    support_score = net_support * (1 + avg_cred)
+    
+    # SCORE 2: Final Score (Used for general ranking/transparency)
+    final_score = 0.50 * net_support + 0.30 * avg_sim + 0.20 * avg_cred
+    
+    metrics = {
+        "avg_ent": avg_ent, 
+        "avg_neu": avg_neu, 
+        "avg_con": avg_con, 
+        "avg_sim": avg_sim, 
+        "avg_cred": avg_cred, 
+        "net_support": net_support,
+        "support_score": support_score
+    }
+    return final_score, metrics, normalized[:top_k]
+
+# ---------------- Main UI inputs ----------------
+claim = st.text_area("Enter claim or news sentence:", height=140, placeholder="e.g. India defeats Pakistan in Asia Cup 2025")
+
+st.info(f"Using **{NUM_RESULTS}** recent news results (Last 24hrs) and analyzing top **{TOP_K_FOR_VERDICT}** matches (Full Power Mode).")
+
+if st.button("Verify Claim"):
+    if not claim.strip():
+        st.warning("Please enter a claim.")
+    else:
+        with st.spinner("Analysing... (this may take a few seconds)"):
+            
+            # 1) Rank-claim check (Wikipedia) if applicable
+            ordinal, role = find_ordinal_and_role(claim)
+            person_candidate = None
+            country = "India" if "india" in claim.lower() else "" 
+            if ordinal and role:
+                person_candidate = extract_person_candidate(claim)
+                m_country = re.search(r'\bof\s+([A-Za-z\s]+)', claim, flags=re.IGNORECASE)
+                if m_country:
+                    country = m_country.group(1).strip()
+                rank_check = check_rank_claim_wikipedia(person_candidate, ordinal, role, country or "India", st.secrets["SERPAPI_KEY"])
+                if rank_check.get("decisive"):
+                    if rank_check.get("result"):
+                        st.markdown("<h2 style='color:green;text-align:center'>✅ TRUE</h2>", unsafe_allow_html=True)
+                        st.write(f"Reason: Authoritative list ({rank_check.get('wiki_url')}) shows **{rank_check.get('matched_name')}** as the {ordinal}th {role} of {country or 'the country'}.")
+                    else:
+                        st.markdown("<h2 style='color:red;text-align:center'>🚨 FAKE</h2>", unsafe_allow_html=True)
+                        st.write(f"Reason: Authoritative list ({rank_check.get('wiki_url')}) shows **{rank_check.get('matched_name')}** as the {rank_check.get('rank')}th {role}, not the {ordinal}th.")
+                    st.write("Source (for verification):", rank_check.get("wiki_url"))
+                    st.stop()  # done
+
+            # 2) SerpAPI fetch (Filtering results to last 24hrs using tbs=qdr:d1)
+            try:
+                # Using tbs=qdr:d1 to filter results to the last 24 hours for better relevance
+                params = {"engine":"google", "q": claim, "tbm":"nws", "tbs":"qdr:d1", "num": NUM_RESULTS, "api_key": st.secrets["SERPAPI_KEY"]}
+                search = GoogleSearch(params)
+                data = search.get_dict()
+                results = data.get("news_results") or data.get("organic_results") or []
+            except Exception as e:
+                st.error("Search failed: " + str(e))
+                results = []
+
+            if not results:
+                st.markdown("<h2 style='color:red;text-align:center'>🚨 FAKE</h2>", unsafe_allow_html=True)
+                st.write("Reason: No relevant **recent** news results returned by the live search API. The claim is unconfirmed or outdated.")
+            else:
+                normalized = []
+                for r in results:
+                    title = r.get("title") or r.get("title_raw") or r.get("title_original") or ""
+                    snippet = r.get("snippet") or r.get("snippet_highlighted") or r.get("excerpt") or ""
+                    link = r.get("link") or r.get("source", {}).get("url") or r.get("source_link") or ""
+                    normalized.append({"title": title, "snippet": snippet, "link": link})
+
+                # compute decision via new intelligence module
+                final_score, metrics, analyzed = analyze_top_articles(normalized, claim, top_k=TOP_K_FOR_VERDICT)
+
+                # DYNAMIC VERDICT LOGIC: (TRUE / FAKE / UNVERIFIABLE)
+                
+                # Condition for TRUE: High credibility-weighted support AND good relevance.
+                if metrics["support_score"] >= 0.15 and metrics["avg_sim"] >= 0.50:
+                    st.markdown("<h2 style='color:green;text-align:center'>✅ TRUE</h2>", unsafe_allow_html=True)
+                    st.write("Reason: **Strong logical support from credible sources** found, confirming the claim's relevance.")
+                    verdict_msg = "TRUE"
+                
+                # Condition for UNVERIFIABLE: Not enough support (low support_score) and low relevance, but high neutrality (no strong contradiction found).
+                elif metrics["avg_sim"] < 0.50 and metrics["avg_neu"] > 0.60:
+                    st.markdown("<h2 style='color:orange;text-align:center'>⚠️ INSUFFICIENT DATA</h2>", unsafe_allow_html=True)
+                    st.write("Reason: Low semantic relevance and high neutral logical probability across sources. The claim is either too vague, futuristic, or lacks sufficient recent confirmation.")
+                    verdict_msg = "UNVERIFIABLE"
+
+                # Default to FAKE: Insufficient support or strong contradiction present.
+                else:
+                    st.markdown("<h2 style='color:red;text-align:center'>🚨 FAKE</h2>", unsafe_allow_html=True)
+                    st.write("Reason: Insufficient combined credibility and logical support, or strong refutation present. The claim is likely refuted, outdated, or lacks reliable confirmation.")
+                    verdict_msg = "FAKE"
+
+
+                st.write(f"Details — Support Score (Credibility Weighted): {metrics['support_score']:.2f}, avg semantic sim: {metrics['avg_sim']:.2f}, net support (E-C): {metrics['net_support']:.2f}")
+
+
+                # show short synthesized reason
+                if verdict_msg == "TRUE":
+                    ex = []
+                    for r in analyzed[:3]:
+                        if r.get("sem_sim", 0.0) > 0.4 and r.get("entail_p", 0.0) > r.get("contra_p", 0.0):
+                            ex.append(textwrap.shorten(r.get("best_sent") or r.get("snippet",""), width=160, placeholder="..."))
+                    if ex:
+                        st.info("Example supporting excerpts: " + " | ".join(ex))
+                elif verdict_msg == "FAKE":
+                    best = analyzed[0] if analyzed else None
+                    if best and best.get("best_sent"):
+                        st.info("Closest (but weak) excerpt: " + textwrap.shorten(best.get("best_sent") or best.get("snippet",""), width=220, placeholder="..."))
+
+                # transparency
+                with st.expander("Show analyzed top sources and scores"):
+                    for idx, r in enumerate(analyzed):
+                        st.markdown(f"**{idx+1}. {r.get('title') or r.get('link','(no title)')}**")
+                        st.write(f"- Domain: {domain_from_url(r.get('link',''))}")
+                        st.write(f"- Semantic similarity (sentence-level): {pretty_pct(r.get('sem_sim',0.0))}")
+                        st.write(f"- **Net Support (Entail-Contra)**: {r.get('entail_p',0.0) - r.get('contra_p',0.0):.2f}")
+                        st.write(f"  (E: {pretty_pct(r.get('entail_p',0.0))} | N: {pretty_pct(r.get('neutral_p',0.0))} | C: {pretty_pct(r.get('contra_p',0.0))})")
+                        st.write(f"- Credibility boost: {r.get('cred',0.0):.2f}")
+                        st.write(f"- Link: {r.get('link')}")
+                        st.markdown("---")
+
+
+# Footer
+st.markdown("---")
+st.caption("Project: NLP-driven Fact-Checking System. Use responsibly.")
+tra_p
         r["sem_sim"] = sem_sim
         r["cred"] = cred
         r["best_sent"] = best_sent 
